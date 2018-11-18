@@ -4,20 +4,6 @@ module full_adder(input x, y, cin, output s, cout);
     assign cout = (x & y) | (cin & (x ^ y));
 endmodule
 
-module full_adder_2(input [1:0] x, y, input cin, output [1:0] s, output out);
-    wire inner_c;
-    full_adder fa1(x[0],
-                   y[0],
-                   cin,
-                   s[0],
-                   inner_c);
-    full_adder fa2(x[1],
-                   y[1],
-                   inner_c,
-                   s[1],
-                   cout);
-endmodule
-
 module full_adder_32(input [31:0] x, y, input cin, output [31:0]s, output cout);
     wire [31:0] cs;
     full_adder fa[31:0] (x,
@@ -68,6 +54,87 @@ module multiplier_32(input [31:0] x, y,
 endmodule
 
 
+module divider_32(
+    input [31:0] numerator,
+    input [31:0] denominator,
+    input clk, r,
+    output [31:0] quotient, remainder,
+    output reg [0:0] finished
+);
+    wire n_to_remainder;
+    wire r_gte_denom;
+    wire [31:0] inv_denominator;
+    wire [31:0] r_prime;
+
+    wire dummy_cout;
+    wire dummy_remainder_so;
+    wire dummy_quot_so;
+    wire dummy_numerator_so;
+
+    wire [31:0] numerator_out;
+
+    reg [1:0] remainder_ctrl;
+    reg [1:0] quotient_ctrl;
+    reg [1:0] numerator_ctrl;
+
+    wire [5:0] count;
+
+    assign r_gte_denom = remainder >= denominator;
+    assign inv_denominator = ~denominator;
+    assign n_to_remainder = numerator_out[31];
+
+    counter c(clk, r, count);
+
+    full_adder_32 subtractor(remainder, inv_denominator, 1'b1,
+                             r_prime, dummy_cout);
+
+    shift_reg quot(r_gte_denom, clk, r, quotient_ctrl,
+                   32'b0, dummy_quot_so, quotient);
+    shift_reg remn(n_to_remainder, clk, r, remainder_ctrl,
+                   r_prime, dummy_remainder_so, remainder);
+    shift_reg n(1'b0, clk, 1'b0, numerator_ctrl,
+                numerator, dummy_numerator_so, numerator_out);
+
+    typedef enum logic [3:0] { D_INIT, D_SHIFT, D_CHECK, D_FINISHED } div_fsm_t;
+    div_fsm_t fsm_state;
+
+    always_ff@(posedge clk) begin
+        if (r) begin
+            fsm_state <= D_SHIFT;
+        end else begin
+            case(fsm_state)
+                D_INIT: begin
+                    numerator_ctrl <= 2'b11;
+                    remainder_ctrl <= 2'b00;
+                    quotient_ctrl <= 2'b00;
+                    fsm_state <= D_SHIFT;
+                end
+                D_SHIFT: begin
+                    remainder_ctrl <= 2'b01;
+                    numerator_ctrl <= 2'b01;
+                    quotient_ctrl <= 2'b01;
+                    fsm_state <= D_CHECK;
+                end
+                D_CHECK: begin
+                    remainder_ctrl <= (r_gte_denom) ? 2'b11 : 2'b00;
+                    numerator_ctrl <= 2'b00;
+                    quotient_ctrl <= 2'b00;
+                    fsm_state <= D_SHIFT;
+                end
+                D_FINISHED: begin
+                    remainder_ctrl <= 2'b00;
+                    numerator_ctrl <= 2'b00;
+                    quotient_ctrl <= 2'b00;
+                    fsm_state <= D_FINISHED;
+                end
+                default: $display("Bad divider FSM state.");
+            endcase
+        end
+    end
+
+endmodule
+
+
 // s = b00 - x + y MOD 32
 // s = b01 - x * y MOD 32
 // s = b10 - x / y iff y =/= 0
@@ -85,6 +152,8 @@ module alu (
     wire [31:0] divider_out;
     wire [31:0] nand_out;
 
+    wire [31:0] multiplier_high;
+
     wire adder_carry_out;
     wire multiplier_finished;
     wire divider_finished;
@@ -99,10 +168,15 @@ module alu (
     mux_4 finished_mux(1'b1,
                        multiplier_finished,
                        divider_finished,
-                       1'b1);
+                       1'b1,
+                       s,
+                       finished);
 
     nand n[31:0](nand_out, x, y);
 
-    full_adder_32(x, y, 1'b0, adder_out, adder_carry_out);
+    full_adder_32 fa(x, y, 1'b0, adder_out, adder_carry_out);
+
+    multiplier_32 mul(x, y, clk, r, multiplier_high,
+                      multiplier_out, multiplier_finished);
     
 endmodule
