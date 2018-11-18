@@ -100,7 +100,10 @@ module divider_32(
 
     always_ff@(posedge clk) begin
         if (r) begin
-            fsm_state <= D_SHIFT;
+            fsm_state <= D_INIT;
+            numerator_ctrl <= 2'b11;
+            remainder_ctrl <= 2'b00;
+            quotient_ctrl <= 2'b00;
         end else begin
             case(fsm_state)
                 D_INIT: begin
@@ -110,13 +113,13 @@ module divider_32(
                     fsm_state <= D_SHIFT;
                 end
                 D_SHIFT: begin
-                    remainder_ctrl <= 2'b01;
+                    remainder_ctrl <= (r_gte_denom) ? 2'b11 : 2'b01;
                     numerator_ctrl <= 2'b01;
                     quotient_ctrl <= 2'b01;
                     fsm_state <= D_CHECK;
                 end
                 D_CHECK: begin
-                    remainder_ctrl <= (r_gte_denom) ? 2'b11 : 2'b00;
+                    remainder_ctrl <= (remainder_ctrl == 2'b11) ? 2'b01 : 2'b00;
                     numerator_ctrl <= 2'b00;
                     quotient_ctrl <= 2'b00;
                     fsm_state <= D_SHIFT;
