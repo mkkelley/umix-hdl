@@ -53,6 +53,9 @@ module multiplier_32(input [31:0] x, y,
     shift_reg q_shr(product_to_q, clk, 1'b0, q_shr_ctrl, x, q_so, q_out);
 endmodule
 
+module fast_multiplier_32(input [31:0] a, b, output [31:0] p);
+    assign p = a * b;
+endmodule
 
 module divider_32(
     input [31:0] numerator,
@@ -95,23 +98,17 @@ module divider_32(
     shift_reg n(1'b0, clk, 1'b0, numerator_ctrl,
                 numerator, dummy_numerator_so, numerator_out);
 
-    typedef enum logic [3:0] { D_INIT, D_SHIFT, D_CHECK, D_FINISHED } div_fsm_t;
+    typedef enum logic [2:0] { D_SHIFT, D_CHECK, D_FINISHED } div_fsm_t;
     div_fsm_t fsm_state;
 
     always_ff@(posedge clk) begin
         if (r) begin
-            fsm_state <= D_INIT;
+            fsm_state <= D_SHIFT;
             numerator_ctrl <= 2'b11;
             remainder_ctrl <= 2'b00;
             quotient_ctrl <= 2'b00;
         end else begin
             case(fsm_state)
-                D_INIT: begin
-                    numerator_ctrl <= 2'b11;
-                    remainder_ctrl <= 2'b00;
-                    quotient_ctrl <= 2'b00;
-                    fsm_state <= D_SHIFT;
-                end
                 D_SHIFT: begin
                     remainder_ctrl <= (r_gte_denom) ? 2'b11 : 2'b01;
                     numerator_ctrl <= 2'b01;
@@ -138,6 +135,15 @@ module divider_32(
 endmodule
 
 
+module fast_divider_32(
+    input [31:0] numerator,
+    input [31:0] denominator,
+    output [31:0] quotient, remainder
+);
+    assign quotient = numerator / denominator;
+    assign remainder = numerator % denominator;
+endmodule
+
 // s = b00 - x + y MOD 32
 // s = b01 - x * y MOD 32
 // s = b10 - x / y iff y =/= 0
@@ -147,16 +153,16 @@ module alu (
     input [31:0] y,
     input [1:0] s,
     input clk, r,
-    output [31:0] out,
-    output finished
+    output [31:0] out
 );
     wire [31:0] adder_out;
     wire [31:0] multiplier_out;
     wire [31:0] divider_out;
     wire [31:0] nand_out;
 
-    wire [31:0] multiplier_high;
+    // wire [31:0] multiplier_high;
 
+    wire [31:0] div_remainder;
     wire adder_carry_out;
     wire multiplier_finished;
     wire divider_finished;
@@ -167,19 +173,13 @@ module alu (
                   nand_out,
                   s,
                   out);
-    
-    mux_4 finished_mux(1'b1,
-                       multiplier_finished,
-                       divider_finished,
-                       1'b1,
-                       s,
-                       finished);
 
     nand n[31:0](nand_out, x, y);
 
     full_adder_32 fa(x, y, 1'b0, adder_out, adder_carry_out);
 
-    multiplier_32 mul(x, y, clk, r, multiplier_high,
-                      multiplier_out, multiplier_finished);
+    fast_multiplier_32 mul(x, y, multiplier_out);
+
+    fast_divider_32 div(x, y, divider_out, div_remainder);
     
 endmodule

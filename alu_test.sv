@@ -31,25 +31,15 @@ module divider_test();
     reg[31:0] n, d;
     wire[31:0] q, r;
 
-    reg clk;
-    reg reset;
-    wire finished;
-
-    divider_32 div(n, d, clk, reset, q, r, finished);
+    fast_divider_32 div(n, d, q, r);
 
     initial begin
-        clk <= 0;
         n <= 32'd99;
         d <= 32'd3;
-        reset <= 1;
 
         #10
 
-        reset <= 0;
-    end
-
-    always begin
-        #5
-        clk = ~clk;
+        n <= 32'd64000;
+        d <= 32'd10;
     end
 endmodule
