@@ -31,6 +31,8 @@ module shr_ar(input si, clk, r, s, input pi, output so, output q);
     dff_ar ds[size - 1:0](d_internal, clk, r, {so, q_internal[size-1:1]});
 endmodule
 
+// s = 0 - shift right
+// s = 1 - parallel load
 module shr_right_ar(input si, clk, r, s, input pi, output so, q);
     parameter size = 32;
     output [size - 1:0] q;
@@ -41,6 +43,31 @@ module shr_right_ar(input si, clk, r, s, input pi, output so, q);
     assign d_internal = s ? pi : {si, q_internal[1+:size-1]};
     dff_ar ds[size - 1:0](d_internal, clk, r, {q_internal[1+:size-1], so});
 endmodule
+
+// b00 - no change
+// b01 - shift left
+// b10 - shift right
+// b11 - parallel load
+module shift_reg(input si, clk, r, [1:0] s,
+                 input pi, output so, q);
+    parameter size = 32;
+    output [size-1:0] q;
+    input [size-1:0] pi;
+    wire [size-1:0] q_internal;
+    wire [size-1:0] d_internal;
+    assign q = q_internal;
+    assign so = q_internal[0];
+
+    mux_4 d_mux(q_internal,
+                {q_internal[0+:31], si},
+                {si, q_internal[1+:31]},
+                pi,
+                s,
+                d_internal);
+
+    dff_ar ds[size-1:0] (d_internal, clk, r, q_internal);
+endmodule
+
 
 module mux_4 #(parameter size = 32)
              (input [size-1:0] a,

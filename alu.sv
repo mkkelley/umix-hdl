@@ -28,10 +28,11 @@ module full_adder_32(input [31:0] x, y, input cin, output [31:0]s, output cout);
 endmodule
 
 module multiplier_32(input [31:0] x, y,
-                     input clk, r, load,
+                     input clk, r,
                      output [31:0] p, q,
-                     output [0:0] finished);
-    wire shr_control;
+                     output reg [0:0] finished);
+    logic [1:0] shr_control;
+    logic [1:0] q_shr_ctrl;
     wire [31:0] adder_out;
     wire [31:0] product_out;
     wire dummy;
@@ -41,18 +42,29 @@ module multiplier_32(input [31:0] x, y,
     wire q_so;
     wire [5:0] c;
 
-    assign product_in = (load) ? 32'b0 : adder_out >> 1;
+    assign product_in = (r) ? 32'b0 : adder_out >> 1;
     assign q = q_out;
     assign p = product_out;
-    assign shr_control = load || q_so;
+    assign q_shr_ctrl = (finished) ? 2'b00 : (r) ? 2'b11 : 2'b10;
 
-    counter count(clk, load, c);
+    always_ff@(posedge clk iff r == 0 or posedge r)
+        if (r)
+            finished <= 1'b0;
+        else
+            finished <= c == 6'b011111 || finished;
 
-    assign finished = c == 6'b100001;
+    always_comb
+        if (finished)
+            shr_control = 2'b00;
+        else if (r || q_so)
+            shr_control = 2'b11;
+        else
+            shr_control = 2'b10;
 
+    counter count(clk, r, c);
     full_adder_32 fa(product_out, y, 1'b0, adder_out, dummy);
-    shr_right_ar product(1'b0, clk, r, shr_control, product_in, product_to_q, product_out);
-    shr_right_ar q_shr(product_to_q, clk, r, load, x, q_so, q_out);
+    shift_reg product(1'b0, clk, r, shr_control, product_in, product_to_q, product_out);
+    shift_reg q_shr(product_to_q, clk, 1'b0, q_shr_ctrl, x, q_so, q_out);
 endmodule
 
 
