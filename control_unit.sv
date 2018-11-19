@@ -75,6 +75,13 @@ module cmov_fsm(input [2:0] regA, regB, regC, [31:0] reg_out_bus, [0:0] clk, r,
         end
 endmodule
 
+// states
+// SELECT_B - reg_out_bus <- (b) after clock
+// SELECT_C - store (b), reg_out_bus <- (c) after clock
+// READ_C - store (c), wait
+// SELECT_MEM - now address + offset are filled, so mem_data_out_bus will be right next cycle
+// WRITE_A - (a) <- mem_data_out_bus
+// FIN - end loop state
 module addr_idx_fsm (
     input [2:0] regA, regB, regC,
     input [31:0] reg_out_bus,
@@ -124,5 +131,62 @@ module addr_idx_fsm (
                 end
                 default: $display("Invalid memory idx case.");
             endcase
+        end
+endmodule
+
+module addr_amend_fsm (
+    input [2:0] regA, regB, regC,
+    input [31:0] reg_out_bus,
+    input [31:0] mem_data_out_bus,
+    input clk, r,
+    output reg_in_bus_t reg_in,
+    output mem_in_bus_t mem_in,
+    output finished
+);
+    typedef enum logic [5:0] { SELECT_A, SELECT_B, SELECT_C, READ_C, WRITE_MEM, FIN } addr_amend_state_t;
+
+    addr_amend_state_t amend_state;
+
+    assign mem_in.data = reg_out_bus;
+    assign mem_in.mode = (WRITE_MEM) ? 2'b01 : 2'b00;
+
+    assign reg_in.mode = 2'b0;
+    assign reg_in.sel = (amend_state == SELECT_B) ?
+                            regB :
+                            (amend_state == SELECT_C) ?
+                                regC :
+                                regA;
+    
+    assign finished = (amend_state == FIN);
+
+    always_ff@(posedge clk)
+        begin
+            if ( r ) begin
+                amend_state <= SELECT_A;
+            end else begin
+                case(amend_state)
+                    SELECT_A: begin
+                        amend_state <= SELECT_B;
+                    end
+                    SELECT_B: begin
+                        mem_in.address <= reg_out_bus;
+                        amend_state <= SELECT_C;
+                    end
+                    SELECT_C: begin
+                        mem_in.offset <= reg_out_bus;
+                        amend_state <= READ_C;
+                    end
+                    READ_C: begin
+                        amend_state <= WRITE_MEM;
+                    end
+                    WRITE_MEM: begin
+                        amend_state <= FIN;
+                    end
+                    FIN: begin
+                        amend_state <= FIN;
+                    end
+                    default: $display("Invalid memory amend case.");
+                endcase
+            end
         end
 endmodule
