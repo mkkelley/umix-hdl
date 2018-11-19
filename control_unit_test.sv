@@ -256,7 +256,7 @@ module addr_amend_test();
 
         enable_manual <= 1;
         manual_reg_in_bus.sel <= 3'b010;
-        manual_reg_in_bus.data <= 32'b0;
+        manual_reg_in_bus.data <= 32'h5c5c5c5c;
         manual_reg_in_bus.mode <= 1'b1;
 
         manual_mem_in.mode <= 2'b01;

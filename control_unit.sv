@@ -61,6 +61,7 @@ module cmov_fsm(input [2:0] regA, regB, regC, [31:0] reg_out_bus, [0:0] clk, r,
                           regC;
     assign reg_in.mode = write_buf_enable;
 
+    // I believe that this is not necessary.
     tribuf_32 out_buf(reg_out_bus, write_buf_enable, reg_in.data);
 
     always_ff@(posedge clk)
@@ -134,6 +135,13 @@ module addr_idx_fsm (
         end
 endmodule
 
+
+// states
+// SELECT_A - get memory address from reg file
+// SELECT_B - get memory offset from reg file
+// SELECT_C - get data to write from reg file
+// WRITE_MEM - a[b] <- (c)
+// FIN - looping close state
 module addr_amend_fsm (
     input [2:0] regA, regB, regC,
     input [31:0] reg_out_bus,
@@ -143,12 +151,12 @@ module addr_amend_fsm (
     output mem_in_bus_t mem_in,
     output finished
 );
-    typedef enum logic [5:0] { SELECT_A, SELECT_B, SELECT_C, READ_C, WRITE_MEM, FIN } addr_amend_state_t;
+    typedef enum logic [4:0] { SELECT_A, SELECT_B, SELECT_C, WRITE_MEM, FIN } addr_amend_state_t;
 
     addr_amend_state_t amend_state;
 
     assign mem_in.data = reg_out_bus;
-    assign mem_in.mode = (WRITE_MEM) ? 2'b01 : 2'b00;
+    assign mem_in.mode = (amend_state == WRITE_MEM) ? 2'b01 : 2'b00;
 
     assign reg_in.mode = 2'b0;
     assign reg_in.sel = (amend_state == SELECT_B) ?
@@ -174,9 +182,6 @@ module addr_amend_fsm (
                     end
                     SELECT_C: begin
                         mem_in.offset <= reg_out_bus;
-                        amend_state <= READ_C;
-                    end
-                    READ_C: begin
                         amend_state <= WRITE_MEM;
                     end
                     WRITE_MEM: begin
