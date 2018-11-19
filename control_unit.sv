@@ -82,37 +82,45 @@ module addr_idx_fsm (
     input clk, r,
     output reg_in_bus_t reg_in,
     output mem_in_bus_t mem_in,
-    output reg finished
+    output finished
 );
-    typedef enum logic [3:0] { SELECT_C, SELECT_MEM, WRITE_A } addr_idx_state_t;
+    typedef enum logic [5:0] { SELECT_B, SELECT_C, READ_C, SELECT_MEM, WRITE_A, FIN } addr_idx_state_t;
     addr_idx_state_t idx_state;
+
+    assign reg_in.data = mem_data_out_bus;
+    assign reg_in.mode = (idx_state == WRITE_A) ? 1'b1 : 1'b0;
+    assign reg_in.sel = (idx_state == WRITE_A) ?
+                            regA :
+                            (idx_state == SELECT_C) ?
+                            regC :
+                            regB;
+    assign mem_in.mode = 2'b00;
+    assign finished = (idx_state == FIN);
 
     always_ff@(posedge clk)
         begin
             if (r) begin
-                reg_in.sel <= regB;
-                reg_in.mode <= 1'b0;
-                mem_in.mode <= 2'b0;
-                finished <= 1'b0;
-                idx_state <= SELECT_C;
+                idx_state <= SELECT_B;
             end else case(idx_state)
+                SELECT_B: begin
+                    idx_state <= SELECT_C;
+                end
                 SELECT_C: begin
                     mem_in.address <= reg_out_bus;
-                    reg_in.sel <= regC;
-                    reg_in.mode <= 1'b0;
+                    idx_state <= READ_C;
+                end
+                READ_C: begin
+                    mem_in.offset <= reg_out_bus;
                     idx_state <= SELECT_MEM;
                 end
                 SELECT_MEM: begin
-                    mem_in.offset <= reg_out_bus;
-                    mem_in.mode <= 2'b00;
                     idx_state <= WRITE_A;
                 end
                 WRITE_A: begin
-                    reg_in.sel <= regA;
-                    reg_in.mode <= 1'b1;
-                    reg_in.data <= mem_data_out_bus;
-                    finished <= 1'b1;
-                    idx_state <= WRITE_A;
+                    idx_state <= FIN;
+                end
+                FIN: begin
+                    idx_state <= FIN;
                 end
                 default: $display("Invalid memory idx case.");
             endcase

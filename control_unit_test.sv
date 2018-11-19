@@ -151,7 +151,6 @@ module addr_idx_test();
 
         #10
 
-        reset_fsm <= 0;
         reset_reg <= 0;
 
         #10
@@ -171,6 +170,10 @@ module addr_idx_test();
         manual_reg_in_bus.sel <= 3'b100;
         manual_reg_in_bus.data <= 32'h5555;
 
+        manual_mem_in.address <= 32'h5555;
+        manual_mem_in.offset <= 32'b1;
+        manual_mem_in.data <= 32'h13131313;
+
         #10
 
         manual_reg_in_bus.sel <= 3'b001;
@@ -179,16 +182,8 @@ module addr_idx_test();
         #10
 
         enable_manual <= 0;
-        enable_fsm_output <= 1;
-        
-        #10
-
-        reset_fsm <= 1;
-
-
-        #10
-
         reset_fsm <= 0;
+        enable_fsm_output <= 1;
     end
 
 
