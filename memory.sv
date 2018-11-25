@@ -38,6 +38,7 @@ module mem_sys(
 	if (reset) begin
 		main_mem <= '{default:32'b0};
 		zero_array_address <= 32'b0;
+		next_alloc <= 32'b10000;
 	end else case(mem_bus.mode)
 		2'b00: data_out <= main_mem[real_address + mem_bus.offset];
 		2'b01: main_mem[real_address + mem_bus.offset] <= mem_bus.data;

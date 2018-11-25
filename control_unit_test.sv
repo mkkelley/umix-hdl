@@ -110,7 +110,7 @@ module addr_idx_test();
 	wire [31:0] mem_out;
 	wire finished;
 	wire enable_fsm;
-	
+
 	assign enable_fsm = !reset_fsm;
 
 	reg_in_bus_t manual_reg_in_bus;
@@ -214,7 +214,7 @@ module addr_amend_test();
 	wire [31:0] mem_out;
 	wire finished;
 	wire enable;
-	
+
 	assign enable = !reset_fsm;
 
 	reg_in_bus_t manual_reg_in_bus;
@@ -295,7 +295,11 @@ module addr_amend_test();
 	end
 endmodule
 
-module adder_ctrl_test();
+module alu_testbench(
+	input [31:0] instr,
+	input [2:0] r,
+	input [31:0] expected_val
+);
 	logic clk;
 	logic reset_mem_reg;
 	logic reset_ctrl;
@@ -368,7 +372,7 @@ module adder_ctrl_test();
 
 		manual_mem_in.address <= 32'b0;
 		manual_mem_in.offset <= 32'b0;
-		manual_mem_in.data <= 32'b0011_0000000000000000000_000_001_010;
+		manual_mem_in.data <= instr;
 		manual_mem_in.mode <= 2'b01;
 
 		manual_reg_in.sel <= 3'b000;
@@ -378,29 +382,30 @@ module adder_ctrl_test();
 		#10
 
 		manual_reg_in.sel <= 3'b001;
-		manual_reg_in.data <= 32'h2c2c;
-
-		#10
-
-		manual_reg_in.sel <= 3'b010;
 		manual_reg_in.data <= 32'h8f8f;
 
 		#10
 
+		manual_reg_in.sel <= 3'b010;
+		manual_reg_in.data <= 32'h2c2c;
+
+		#10
+
+		manual_reg_in.mode <= 1'b0;
 		reset_ctrl <= 1'b0;
 		enable_manual <= 1'b0;
 		enable_cu <= 1'b1;
 
-		#40
+		#50
 
 		enable_manual <= 1'b1;
 		enable_cu <= 1'b0;
 		manual_reg_in.mode = 1'b0;
-		manual_reg_in.sel <= 3'b000;
+		manual_reg_in.sel <= r;
 
 		#10
 
-		A_REG_HAS_CORRECT_VAL : assert(reg_data_out == 32'hbbbb);
+		REG_R_HAS_CORRECT_VAL : assert(reg_data_out == expected_val);
 
 	end
 
@@ -410,3 +415,50 @@ module adder_ctrl_test();
 	end
 endmodule
 
+module adder_ctrl_test();
+	alu_testbench adder_test(
+		32'b0011_0000000000000000000_000_001_010,
+		3'b000,
+		32'hbbbb
+	);
+endmodule
+
+module mult_ctrl_test();
+	alu_testbench mult_test(
+		32'b0100_0000000000000000000_000_001_010,
+		3'b000,
+		32'h18c54094
+	);
+endmodule
+
+module div_ctrl_test();
+	alu_testbench div_test(
+		32'b0101_0000000000000000000_000_001_010,
+		3'b000,
+		32'd3
+	);
+endmodule
+
+module nand_ctrl_test();
+	alu_testbench nand_test(
+		32'b0110_0000000000000000000_000_001_010,
+		3'b000,
+		~(32'h8f8f & 32'h2c2c) 
+	);
+endmodule
+
+module alloc_ctrl_test();
+	alu_testbench alloc_test(
+		32'b1000_0000000000000000000_000_001_010,
+		3'b001,
+		32'b10000
+	);
+endmodule
+
+module ortho_ctrl_test();
+	alu_testbench ortho_test(
+		32'b1101_010_0110011001100110011010101,
+		3'b010,
+		32'b0000000_0110011001100110011010101
+	);
+endmodule

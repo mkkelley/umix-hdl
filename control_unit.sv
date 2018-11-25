@@ -76,6 +76,28 @@ module control_unit(
 	assign alu_x = fsm_alu_x[instr];
 	assign alu_y = fsm_alu_y[instr];
 
+	// No need for separate FSMs for add/mult/div/nand
+	// because we select the ALU mode in this module.
+	assign fsm_reg_in[4] = fsm_reg_in[3];
+	assign fsm_reg_in[5] = fsm_reg_in[3];
+	assign fsm_reg_in[6] = fsm_reg_in[3];
+
+	assign fsm_alu_x[4] = fsm_alu_x[3];
+	assign fsm_alu_x[5] = fsm_alu_x[3];
+	assign fsm_alu_x[6] = fsm_alu_x[3];
+
+	assign fsm_alu_y[4] = fsm_alu_y[3];
+	assign fsm_alu_y[5] = fsm_alu_y[3];
+	assign fsm_alu_y[6] = fsm_alu_y[3];
+
+	assign instr_finished[4] = instr_finished[3];
+	assign instr_finished[5] = instr_finished[3];
+	assign instr_finished[6] = instr_finished[3];
+
+	assign enable_alu_fsm = (enable_fsm[3] || enable_fsm[4] || enable_fsm[5] || enable_fsm[6]);
+
+	// end alu stuff
+
 	accumulator offset_acc(offset_in, offset_ctrl, clk, offset);
 
 	cmov_fsm cmov(regA, regB, regC, reg_data_out, clk, r,
@@ -98,18 +120,35 @@ module control_unit(
 		instr_finished[2]
 	);
 
-	adder_fsm adder(
+	alu_fsm adder(
 		regA, regB, regC,
 		reg_data_out,
 		alu_result,
-		clk, enable_fsm[3],
+		clk, enable_alu_fsm,
 		fsm_reg_in[3],
 		fsm_alu_x[3],
 		fsm_alu_y[3],
 		instr_finished[3]
 	);
+	
+	alloc_fsm alloc(
+		regB, regC,
+		reg_data_out,
+		mem_data_out,
+		clk, enable_fsm[8],
+		fsm_reg_in[8],
+		fsm_mem_in[8],
+		instr_finished[8]
+	);
+	
+	ortho_fsm ortho(
+		instr_word,
+		clk,
+		fsm_reg_in[13],
+		instr_finished[13]
+	);
 
-	typedef enum logic [1:0] { CTRL_FETCH, CTRL_EXECUTE } ctrl_state_t;
+	typedef enum logic [2:0] { CTRL_FETCH, CTRL_EXECUTE, CTRL_CONTINUE } ctrl_state_t;
 	ctrl_state_t ctrl_state, next_state;
 
 	assign offset_ctrl = (init) ? 2'b11 : (ctrl_state == CTRL_FETCH) ? 2'b01 : 2'b00;
@@ -125,6 +164,7 @@ module control_unit(
 		mem_ctrl.offset = offset;
 		mem_ctrl.mode = 2'b00;
 		alu_mode = 'x;
+		instr_word = instr_word;
 		r = 0;
 		enable_fsm = 14'b0;
 		case ( ctrl_state )
@@ -145,7 +185,21 @@ module control_unit(
 					4'bz110: alu_mode = 2'b11;
 					default: alu_mode = 2'bzz;
 				endcase
-				next_state = instr_finished[instr] ? CTRL_FETCH : CTRL_EXECUTE;
+				next_state = CTRL_CONTINUE;
+			end
+			CTRL_CONTINUE: begin
+				mem_ctrl = fsm_mem_in[instr];
+				reg_ctrl = fsm_reg_in[instr];
+				enable_fsm[instr] = 1'b1;
+				
+				casez (instr)
+					4'bzz11: alu_mode = 2'b00;
+					4'bz100: alu_mode = 2'b01;
+					4'bz101: alu_mode = 2'b10;
+					4'bz110: alu_mode = 2'b11;
+					default: alu_mode = 2'bzz;
+				endcase
+				next_state = instr_finished[instr] ? CTRL_FETCH : CTRL_CONTINUE;
 			end
 			default: $display("Bad case in control unit fsm");
 		endcase
@@ -313,7 +367,7 @@ module addr_amend_fsm (
 	end
 endmodule
 
-module adder_fsm (
+module alu_fsm (
 	input [2:0] regA, regB, regC,
 	input [31:0] reg_out_bus,
 	input [31:0] alu_out,
@@ -376,4 +430,75 @@ module adder_fsm (
 			endcase
 		end
 	end
+endmodule
+
+module alloc_fsm(
+	input [2:0] regB, regC,
+	input [31:0] reg_out_bus,
+	input [31:0] mem_out_bus,
+	input clk, en,
+	output reg_in_bus_t reg_in,
+	output mem_in_bus_t mem_in,
+	output logic finished
+);
+	typedef enum logic [2:0] { SELECT_C, ALLOC, WRITE_B, FIN } alloc_state_t;
+
+	alloc_state_t alloc_state, next_state;
+	
+	assign mem_in.offset = reg_out_bus;
+	assign reg_in.data = mem_out_bus;
+	
+	always_comb
+		begin
+			reg_in.mode = 1'b0;
+			reg_in.sel = 'x;
+			mem_in.mode = 2'b00;
+			next_state = SELECT_C;
+			finished = 1'b0;
+			case ( alloc_state )
+				SELECT_C: begin
+					reg_in.mode = 1'b0;
+					reg_in.sel = regC;
+					next_state = ALLOC;
+				end
+				ALLOC: begin
+					mem_in.mode = 2'b10;
+					next_state = WRITE_B;
+				end
+				WRITE_B: begin
+					reg_in.mode = 1'b1;
+					reg_in.sel = regB;
+					next_state = FIN;
+				end
+				FIN: begin
+					finished = 1'b1;
+					next_state = FIN;
+				end
+			endcase		
+		end
+
+	always_ff@(posedge clk)
+	if ( !en )
+		alloc_state <= SELECT_C;
+	else
+		alloc_state <= next_state;
+endmodule
+
+module ortho_fsm(
+	input [31:0] instr_word,
+	input clk,
+	output reg_in_bus_t reg_in,
+	output finished
+);
+	wire [2:0] regA;
+	wire [24:0] val;
+	
+	assign regA = instr_word[25+:3];
+	assign val = instr_word[0+:25];
+	
+	assign reg_in.sel = regA;
+	assign reg_in.mode = 1'b1;
+	assign reg_in.data = {7'b0, val};
+	
+	assign finished = 1;
 endmodule
