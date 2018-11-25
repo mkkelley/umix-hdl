@@ -6,7 +6,10 @@ module mem_in_bus_buf(
 	input en,
 	output mem_in_bus_t out
 );
-	assign out = (en) ? in : {32'bz, 32'bz, 32'bz, 3'bz};
+	tribuf_32 address_buf(in.address, en, out.address);
+	tribuf_32 offset_buf(in.offset, en, out.offset);
+	tribuf_32 data_buf(in.data, en, out.data);
+	tribuf_n #(2) mode_buf(in.mode, en, out.mode);
 endmodule
 
 // mode = 2'b00 -> data_out = *(address + offset)
@@ -43,6 +46,6 @@ module mem_sys(
 			next_alloc <= next_alloc + mem_bus.offset;
 		end
 		2'b11: zero_array_address <= mem_bus.data;
-		default: $display("");
+		default: $display("Bad case in memory mode");
 	endcase
 endmodule

@@ -383,6 +383,17 @@ module adder_ctrl_test();
 		enable_manual <= 1'b0;
 		enable_cu <= 1'b1;
 
+		#50
+
+		enable_manual <= 1'b1;
+		enable_cu <= 1'b0;
+		manual_reg_in.mode = 1'b0;
+		manual_reg_in.sel <= 3'b000;
+
+		#10
+
+		A_REG_HAS_CORRECT_VAL : assert(reg_data_out == 32'hbbbb);
+
 	end
 
 	always begin

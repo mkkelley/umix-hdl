@@ -109,10 +109,10 @@ module control_unit(
 		instr_finished[3]
 	);
 
-	typedef enum logic [2:0] { CTRL_RESET, CTRL_FETCH, CTRL_EXECUTE } ctrl_state_t;
+	typedef enum logic [1:0] { CTRL_FETCH, CTRL_EXECUTE } ctrl_state_t;
 	ctrl_state_t ctrl_state, next_state;
 
-	assign offset_ctrl = (init) ? 2'b11 : (ctrl_state == CTRL_RESET) ? 2'b01 : 2'b00;
+	assign offset_ctrl = (init) ? 2'b11 : (ctrl_state == CTRL_FETCH) ? 2'b01 : 2'b00;
 
 	always_comb
 	begin
@@ -129,17 +129,12 @@ module control_unit(
 		enable_fsm = 14'b0;
 		case ( ctrl_state )
 			CTRL_FETCH: begin
-				next_state = CTRL_RESET;
-			end
-			CTRL_RESET: begin
-				instr_word = mem_data_out;
-				r = 1;
-
 				next_state = CTRL_EXECUTE;
 			end
 			CTRL_EXECUTE: begin
 				mem_ctrl = fsm_mem_in[instr];
 				reg_ctrl = fsm_reg_in[instr];
+				instr_word = mem_data_out;
 
 				enable_fsm[instr] = 1'b1;
 

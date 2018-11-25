@@ -40,7 +40,9 @@ module reg_in_bus_buf (
     input en,
     output reg_in_bus_t out
 );
-    assign out = (en) ? reg_in : '{32'bz, 3'bz, 1'bz};
+    tribuf_32 data_buf(reg_in.data, en, out.data);
+    tribuf_n #(3) sel_buf(reg_in.sel, en, out.sel);
+    tribuf_n #(1) mode_buf(reg_in.mode, en, out.mode);
 endmodule
 
 // s = 1 -> Load d into reg[r]
