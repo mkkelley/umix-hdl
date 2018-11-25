@@ -141,6 +141,14 @@ module control_unit(
 		instr_finished[8]
 	);
 	
+	display_fsm display(
+		regC,
+		reg_data_out,
+		clk, enable_fsm[10],
+		fsm_reg_in[10],
+		instr_finished[10]
+	);
+	
 	ortho_fsm ortho(
 		instr_word,
 		clk,
@@ -441,7 +449,7 @@ module alloc_fsm(
 	output mem_in_bus_t mem_in,
 	output logic finished
 );
-	typedef enum logic [2:0] { SELECT_C, ALLOC, WRITE_B, FIN } alloc_state_t;
+	typedef enum logic [3:0] { SELECT_C, ALLOC, WRITE_B, FIN } alloc_state_t;
 
 	alloc_state_t alloc_state, next_state;
 	
@@ -482,6 +490,45 @@ module alloc_fsm(
 		alloc_state <= SELECT_C;
 	else
 		alloc_state <= next_state;
+endmodule
+
+module display_fsm(
+	input [2:0] regC,
+	input [31:0] reg_out_bus,
+	input clk, en,
+	output reg_in_bus_t reg_in,
+	output logic finished
+);
+	
+	typedef enum logic [2:0] { SELECT_C, DISPLAY, FIN } display_state_t;
+	display_state_t display_state, next_state;
+	
+	assign reg_in.sel = regC;
+	assign reg_in.mode = 1'b0;
+	
+	always_comb
+		begin
+			finished = 0;
+			case ( display_state )
+				SELECT_C: begin
+					next_state = DISPLAY;
+				end
+				DISPLAY: begin
+					$write("%c", reg_out_bus);
+					next_state = FIN;
+				end
+				FIN: begin
+					finished = 1;
+					next_state = FIN;
+				end
+			endcase
+		end
+	
+	always@(posedge clk)
+		if ( !en )
+			display_state <= SELECT_C;
+		else
+			display_state <= next_state;
 endmodule
 
 module ortho_fsm(

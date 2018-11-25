@@ -100,7 +100,7 @@ module mux_4 #(parameter size = 32)
             2'b01: y = b;
             2'b10: y = c;
             2'b11: y = d;
-            default: $display("Error in mux_4 case");
+            //default: $display("Error in mux_4 case");
         endcase
 endmodule
 

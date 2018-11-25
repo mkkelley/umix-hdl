@@ -462,3 +462,97 @@ module ortho_ctrl_test();
 		32'b0000000_0110011001100110011010101
 	);
 endmodule
+
+module display_ctrl_test();
+	logic clk;
+	logic reset_mem_reg;
+	logic reset_ctrl;
+
+	reg enable_manual;
+	reg enable_cu;
+
+	wire [31:0] reg_data_out;
+	wire [31:0] mem_data_out;
+
+	wire [31:0] alu_x;
+	wire [31:0] alu_y;
+	wire [31:0] alu_out;
+	wire [1:0] alu_s;
+
+	reg_in_bus_t manual_reg_in;
+	mem_in_bus_t manual_mem_in;
+
+	reg_in_bus_t cu_reg_in;
+	mem_in_bus_t cu_mem_in;
+
+	reg_in_bus_t reg_in;
+	mem_in_bus_t mem_in;
+
+	mem_in_bus_buf m_mem_buf(manual_mem_in, enable_manual, mem_in);
+	mem_in_bus_buf cu_mem_buf(cu_mem_in, enable_cu, mem_in);
+
+	reg_in_bus_buf m_reg_buf(manual_reg_in, enable_manual, reg_in);
+	reg_in_bus_buf cu_reg_buf(cu_reg_in, enable_cu, reg_in);
+
+	mem_sys ms(
+		mem_in,
+		clk,
+		reset_mem_reg,
+		mem_data_out
+	);
+
+	reg_bank rb(
+		reg_in,
+		reset_mem_reg,
+		clk,
+		reg_data_out
+	);
+
+	alu a(
+		alu_x, alu_y, alu_s, clk, alu_out
+	);
+
+	control_unit cu(
+		mem_data_out,
+		reg_data_out,
+		alu_out,
+		clk,
+		reset_ctrl,
+		cu_reg_in,
+		cu_mem_in,
+		alu_x,
+		alu_y,
+		alu_s
+	);
+
+	initial begin
+		reset_mem_reg <= 1'b1;
+		reset_ctrl <= 1'b1;
+		enable_manual <= 1'b1;
+		enable_cu <= 1'b0;
+		clk <= 1'b0;
+		#10
+		reset_mem_reg <= 1'b0;
+
+		manual_mem_in.address <= 32'b0;
+		manual_mem_in.offset <= 32'b0;
+		manual_mem_in.data <= 32'b1010_0000000000000000000_000_001_000;
+		manual_mem_in.mode <= 2'b01;
+
+		manual_reg_in.sel <= 3'b000;
+		manual_reg_in.data <= 32'h5a;
+		manual_reg_in.mode <= 1'b1;
+
+		#10
+
+		manual_reg_in.mode <= 1'b0;
+		reset_ctrl <= 1'b0;
+		enable_manual <= 1'b0;
+		enable_cu <= 1'b1;
+	end
+
+	always begin
+		#5
+		clk = ~clk;
+	end
+endmodule
