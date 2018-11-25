@@ -85,7 +85,7 @@ module control_unit(
 	addr_idx_fsm addr_idx(
 		regA, regB, regC,
 		reg_data_out, mem_data_out,
-		clk, r,
+		clk, enable_fsm[1],
 		fsm_reg_in[1], fsm_mem_in[1],
 		instr_finished[1]
 	);
@@ -208,7 +208,7 @@ module addr_idx_fsm (
 	input [2:0] regA, regB, regC,
 	input [31:0] reg_out_bus,
 	input [31:0] mem_data_out_bus,
-	input clk, r,
+	input clk, en,
 	output reg_in_bus_t reg_in,
 	output mem_in_bus_t mem_in,
 	output finished
@@ -228,7 +228,7 @@ module addr_idx_fsm (
 
 	always_ff@(posedge clk)
 	begin
-		if (r) begin
+		if ( !en ) begin
 			idx_state <= SELECT_B;
 		end else case(idx_state)
 			SELECT_B: begin
@@ -251,7 +251,6 @@ module addr_idx_fsm (
 			FIN: begin
 				idx_state <= FIN;
 			end
-			default: $display("Invalid memory idx case.");
 		endcase
 	end
 endmodule
@@ -321,12 +320,14 @@ module adder_fsm (
 	input clk, en,
 	output reg_in_bus_t reg_in,
 	output reg [31:0] alu_x,
-	output reg [31:0] alu_y,
+	output [31:0] alu_y,
 	output logic finished
 );
 
-	typedef enum logic [4:0] { SELECT_B, SELECT_C, WAIT_ALU, WRITE_A, FIN } adder_state_t;
+	typedef enum logic [3:0] { SELECT_B, SELECT_C, WRITE_A, FIN } adder_state_t;
 	adder_state_t adder_state;
+
+	assign alu_y = reg_out_bus;
 
 	always_comb
 	begin
@@ -335,8 +336,6 @@ module adder_fsm (
 			SELECT_B: begin
 				reg_in.sel = regB;
 				reg_in.mode = 1'b0;
-			end
-			WAIT_ALU: begin
 			end
 			SELECT_C: begin
 				reg_in.sel = regC;
@@ -365,12 +364,6 @@ module adder_fsm (
 				end
 				SELECT_C: begin
 					alu_x <= reg_out_bus;
-					adder_state <= WAIT_ALU;
-				end
-				// it may be possible to skip this state by
-				// setting alu_y = reg_out_bus above
-				WAIT_ALU: begin
-					alu_y <= reg_out_bus;
 					adder_state <= WRITE_A;
 				end
 				WRITE_A: begin

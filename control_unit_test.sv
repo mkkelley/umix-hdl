@@ -109,6 +109,9 @@ module addr_idx_test();
 	wire [31:0] reg_data_out;
 	wire [31:0] mem_out;
 	wire finished;
+	wire enable_fsm;
+	
+	assign enable_fsm = !reset_fsm;
 
 	reg_in_bus_t manual_reg_in_bus;
 	reg_in_bus_t reg_in_bus;
@@ -133,7 +136,7 @@ module addr_idx_test();
 	addr_idx_fsm aifsm(
 		regA, regB, regC,
 		reg_data_out, mem_out,
-		clk, reset_fsm,
+		clk, enable_fsm,
 		fsm_reg_in,
 		idx_mem_in,
 		finished
@@ -145,6 +148,8 @@ module addr_idx_test();
 		reset_reg <= 1;
 		reset_fsm <= 1;
 
+		// a <- (b)[c]
+		// reg1 <- (reg4)[reg2]
 		instr_word <= 32'b0001_0000000000000000000_001_100_010;
 		enable_fsm_output <= 0;
 
@@ -208,6 +213,9 @@ module addr_amend_test();
 	wire [31:0] reg_data_out;
 	wire [31:0] mem_out;
 	wire finished;
+	wire enable;
+	
+	assign enable = !reset_fsm;
 
 	reg_in_bus_t manual_reg_in_bus;
 	reg_in_bus_t reg_in_bus;
@@ -232,7 +240,7 @@ module addr_amend_test();
 	addr_amend_fsm aafsm(
 		regA, regB, regC,
 		reg_data_out, mem_out,
-		clk, reset_fsm,
+		clk, enable,
 		fsm_reg_in,
 		idx_mem_in,
 		finished
@@ -383,7 +391,7 @@ module adder_ctrl_test();
 		enable_manual <= 1'b0;
 		enable_cu <= 1'b1;
 
-		#50
+		#40
 
 		enable_manual <= 1'b1;
 		enable_cu <= 1'b0;

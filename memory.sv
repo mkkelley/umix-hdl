@@ -46,6 +46,5 @@ module mem_sys(
 			next_alloc <= next_alloc + mem_bus.offset;
 		end
 		2'b11: zero_array_address <= mem_bus.data;
-		default: $display("Bad case in memory mode");
 	endcase
 endmodule
