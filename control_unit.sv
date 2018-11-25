@@ -58,6 +58,7 @@ module control_unit(
 	wire [3:0] instr;
 
 	wire [13:0] instr_finished;
+	logic [13:0] enable_fsm;
 
 	instr_decoder idecode(instr_word, instr, regA, regB, regC);
 
@@ -101,7 +102,7 @@ module control_unit(
 		regA, regB, regC,
 		reg_data_out,
 		alu_result,
-		clk, r,
+		clk, enable_fsm[3],
 		fsm_reg_in[3],
 		fsm_alu_x[3],
 		fsm_alu_y[3],
@@ -111,7 +112,7 @@ module control_unit(
 	typedef enum logic [2:0] { CTRL_RESET, CTRL_FETCH, CTRL_EXECUTE } ctrl_state_t;
 	ctrl_state_t ctrl_state, next_state;
 
-	assign offset_ctrl = (ctrl_state == CTRL_FETCH) ? 2'b01 : 2'b00;
+	assign offset_ctrl = (init) ? 2'b11 : (ctrl_state == CTRL_RESET) ? 2'b01 : 2'b00;
 
 	always_comb
 	begin
@@ -120,16 +121,14 @@ module control_unit(
 		reg_ctrl.sel = 'x;
 		reg_ctrl.mode = 1'b0;
 		mem_ctrl.data = 'x;
-		mem_ctrl.address = 'x;
-		mem_ctrl.offset = 'x;
+		mem_ctrl.address = '0;
+		mem_ctrl.offset = offset;
 		mem_ctrl.mode = 2'b00;
 		alu_mode = 'x;
 		r = 0;
+		enable_fsm = 14'b0;
 		case ( ctrl_state )
 			CTRL_FETCH: begin
-				mem_ctrl.mode = 2'b00;
-				mem_ctrl.address = 32'b0;
-				mem_ctrl.offset = offset;
 				next_state = CTRL_RESET;
 			end
 			CTRL_RESET: begin
@@ -141,6 +140,8 @@ module control_unit(
 			CTRL_EXECUTE: begin
 				mem_ctrl = fsm_mem_in[instr];
 				reg_ctrl = fsm_reg_in[instr];
+
+				enable_fsm[instr] = 1'b1;
 
 				casez (instr)
 					4'bzz11: alu_mode = 2'b00;
@@ -270,7 +271,7 @@ module addr_amend_fsm (
 	input [2:0] regA, regB, regC,
 	input [31:0] reg_out_bus,
 	input [31:0] mem_data_out_bus,
-	input clk, r,
+	input clk, en,
 	output reg_in_bus_t reg_in,
 	output mem_in_bus_t mem_in,
 	output finished
@@ -285,15 +286,13 @@ module addr_amend_fsm (
 	assign reg_in.mode = 2'b0;
 	assign reg_in.sel = (amend_state == SELECT_B) ?
 	regB :
-	(amend_state == SELECT_C) ?
-	regC :
-	regA;
+	(amend_state == SELECT_C) ? regC : regA;
 
 	assign finished = (amend_state == FIN);
 
 	always_ff@(posedge clk)
 	begin
-		if ( r ) begin
+		if ( !en ) begin
 			amend_state <= SELECT_A;
 		end else begin
 			case(amend_state)
@@ -324,41 +323,45 @@ module adder_fsm (
 	input [2:0] regA, regB, regC,
 	input [31:0] reg_out_bus,
 	input [31:0] alu_out,
-	input clk, r,
+	input clk, en,
 	output reg_in_bus_t reg_in,
 	output reg [31:0] alu_x,
 	output reg [31:0] alu_y,
-	output finished
+	output logic finished
 );
 
 	typedef enum logic [4:0] { SELECT_B, SELECT_C, WAIT_ALU, WRITE_A, FIN } adder_state_t;
 	adder_state_t adder_state;
 
 	always_comb
-	case (adder_state)
-		SELECT_B: begin
-			reg_in.sel = regB;
-			reg_in.mode = 1'b0;
-		end
-		WAIT_ALU: begin
-		end
-		SELECT_C: begin
-			reg_in.sel = regC;
-			reg_in.mode = 1'b0;
-		end
-		WRITE_A: begin
-			reg_in.sel = regA;
-			reg_in.mode = 1'b1;
-			reg_in.data = alu_out;
-		end
-		FIN: begin
-			reg_in.mode = 1'b0;
-		end
-		default: $display("Bad case in adder_fsm");
-	endcase
+	begin
+		finished = 1'b0;
+		case (adder_state)
+			SELECT_B: begin
+				reg_in.sel = regB;
+				reg_in.mode = 1'b0;
+			end
+			WAIT_ALU: begin
+			end
+			SELECT_C: begin
+				reg_in.sel = regC;
+				reg_in.mode = 1'b0;
+			end
+			WRITE_A: begin
+				reg_in.sel = regA;
+				reg_in.mode = 1'b1;
+				reg_in.data = alu_out;
+			end
+			FIN: begin
+				reg_in.mode = 1'b0;
+				finished = 1'b1;
+			end
+			default: $display("Bad case in adder_fsm");
+		endcase
+	end
 	always_ff@(posedge clk)
 	begin
-		if ( r ) begin
+		if ( !en ) begin
 			adder_state <= SELECT_B;
 		end else begin
 			case(adder_state)

@@ -22,6 +22,11 @@ module reg_32(input [31:0] in, input clk, r, en, output reg [31:0] q);
             q <= in;
 endmodule
 
+/*
+ * This is a reg_32 with a tristate buffer in front.
+ * 
+ * en enables the inner reg_32, en_out enables the tristate buffer
+ */
 module buffered_reg_32(input in, input clk, r, en, en_out, output q);
     input [31:0] in;
     output [31:0] q;

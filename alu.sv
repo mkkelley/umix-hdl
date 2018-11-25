@@ -152,7 +152,7 @@ module alu (
     input [31:0] x,
     input [31:0] y,
     input [1:0] s,
-    input clk, r,
+    input clk,
     output [31:0] out
 );
     wire [31:0] adder_out;
