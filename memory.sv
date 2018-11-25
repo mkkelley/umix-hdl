@@ -19,7 +19,7 @@ module mem_sys(
     input reset,
     output reg [31:0] data_out
 );
-    reg [31:0] main_mem [33554432:0]; // gives 128MB ram 128/4*2^20
+    reg [31:0] main_mem [33554431:0]; // gives 128MB ram 128/4*2^20
     reg [31:0] next_alloc;
     reg [31:0] zero_array_address;
 

@@ -1,3 +1,4 @@
+# modelsim
 /wlft*
 *.bak
 a.out
@@ -5,3 +6,8 @@ a.out
 *.mti
 *.mpf
 *.wlf
+/transcript
+
+# sigasi
+/.library_mapping*
+/.project

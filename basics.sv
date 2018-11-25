@@ -68,6 +68,24 @@ module shift_reg(input si, clk, r, [1:0] s,
     dff_ar ds[size-1:0] (d_internal, clk, r, q_internal);
 endmodule
 
+// mode == 1'b00 -> read
+// mode == 1'b01 -> reg++
+// mode == 1'b10 -> write in to reg
+// mode == 1'b11 -> zero reg
+module accumulator(
+	input [31:0] in,
+	input [1:0] mode,
+	input clk,
+	output reg [31:0] out
+);
+	always_ff@(posedge clk)
+		case (mode)
+			2'b00: out <= out;
+			2'b01: out <= out + 1;
+			2'b10: out <= in;
+			2'b11: out <= 0;
+		endcase
+endmodule
 
 module mux_4 #(parameter size = 32)
              (input [size-1:0] a,
@@ -84,6 +102,18 @@ module mux_4 #(parameter size = 32)
             2'b11: y = d;
             default: $display("Error in mux_4 case");
         endcase
+endmodule
+
+module mux_n #(
+	parameter data_width = 32,
+	parameter n_inputs = 4,
+	parameter n_select = 2
+) (
+	input [data_width-1:0] data [n_inputs-1:0],
+	input [n_select-1:0] select,
+	output [data_width-1:0] q
+);
+	assign q = data[select];
 endmodule
 
 
