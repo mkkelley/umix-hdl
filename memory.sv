@@ -4,7 +4,7 @@ import BusTypes::mem_in_bus_t;
 module mem_in_bus_buf(
 	input mem_in_bus_t in,
 	input en,
-	output mem_in_bus_t out
+	output tri mem_in_bus_t out
 );
 	tribuf_32 address_buf(in.address, en, out.address);
 	tribuf_32 offset_buf(in.offset, en, out.offset);

@@ -321,8 +321,8 @@ module alu_testbench(
 	reg_in_bus_t cu_reg_in;
 	mem_in_bus_t cu_mem_in;
 
-	reg_in_bus_t reg_in;
-	mem_in_bus_t mem_in;
+	tri reg_in_bus_t reg_in;
+	tri mem_in_bus_t mem_in;
 
 	mem_in_bus_buf m_mem_buf(manual_mem_in, enable_manual, mem_in);
 	mem_in_bus_buf cu_mem_buf(cu_mem_in, enable_cu, mem_in);

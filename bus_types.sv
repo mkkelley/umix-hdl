@@ -13,4 +13,10 @@ typedef struct {
     logic mode;
 } reg_in_bus_t;
 
+typedef struct {
+	logic [31:0] addr;
+	logic [31:0] len;
+	logic mode;
+} astore_in_bus_t;
+
 endpackage: BusTypes

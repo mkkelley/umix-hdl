@@ -6,11 +6,11 @@ module tristate_buffer(input x, input en, output y);
 endmodule
 
 module tribuf_n #(parameter size = 4)
-                (input [size-1:0] xs, input [0:0] en, output [size-1:0] ys);
+                (input [size-1:0] xs, input [0:0] en, output tri [size-1:0] ys);
     tristate_buffer tb[size-1:0] (xs, en, ys);
 endmodule
 
-module tribuf_32(input [31:0] xs, input [0:0] en, output [31:0] ys);
+module tribuf_32(input [31:0] xs, input [0:0] en, output tri [31:0] ys);
     tristate_buffer tb[31:0] (xs, en, ys);
 endmodule
 
@@ -38,7 +38,7 @@ endmodule
 module reg_in_bus_buf (
     input reg_in_bus_t reg_in,
     input en,
-    output reg_in_bus_t out
+    output tri reg_in_bus_t out
 );
     tribuf_32 data_buf(reg_in.data, en, out.data);
     tribuf_n #(3) sel_buf(reg_in.sel, en, out.sel);

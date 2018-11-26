@@ -1,6 +1,7 @@
 
 import BusTypes::reg_in_bus_t;
 import BusTypes::mem_in_bus_t;
+import BusTypes::astore_in_bus_t;
 
 // control unit
 // instructions
@@ -57,6 +58,10 @@ module control_unit(
 	wire [2:0] regC;
 	wire [3:0] instr;
 
+	wire [31:0] array_len_out;
+	wire array_found;
+	wire array_finished;
+
 	wire [13:0] instr_finished;
 	logic [13:0] enable_fsm;
 
@@ -67,12 +72,16 @@ module control_unit(
 
 	mem_in_bus_t mem_in;
 	mem_in_bus_t fsm_mem_in [13:0];
+	
+	astore_in_bus_t a_in;
+	astore_in_bus_t fsm_a_in [13:0];
 
 	wire [31:0] fsm_alu_x [13:0];
 	wire [31:0] fsm_alu_y [13:0];
 
 	assign reg_in = fsm_reg_in[instr];
 	assign mem_in = fsm_mem_in[instr];
+	assign a_in = fsm_a_in[instr];
 	assign alu_x = fsm_alu_x[instr];
 	assign alu_y = fsm_alu_y[instr];
 
@@ -107,6 +116,14 @@ module control_unit(
 	assign fsm_alu_y[9] = 'z;
 
 	// End Free operation changes
+	
+	array_length_store als(
+		a_in,
+		clk, init,
+		array_len_out,
+		array_found,
+		array_finished
+	);
 
 	accumulator offset_acc(offset_in, offset_ctrl, clk, offset);
 
@@ -148,6 +165,7 @@ module control_unit(
 		clk, enable_fsm[8],
 		fsm_reg_in[8],
 		fsm_mem_in[8],
+		fsm_a_in[8],
 		instr_finished[8]
 	);
 	
@@ -457,6 +475,7 @@ module alloc_fsm(
 	input clk, en,
 	output reg_in_bus_t reg_in,
 	output mem_in_bus_t mem_in,
+	output astore_in_bus_t a_in,
 	output logic finished
 );
 	typedef enum logic [3:0] { SELECT_C, ALLOC, WRITE_B, FIN } alloc_state_t;
@@ -465,13 +484,16 @@ module alloc_fsm(
 	
 	assign mem_in.offset = reg_out_bus;
 	assign reg_in.data = mem_out_bus;
+	assign a_in.len = reg_out_bus;
+	assign a_in.addr = mem_out_bus;
 	
 	always_comb
 		begin
 			reg_in.mode = 1'b0;
 			reg_in.sel = 'x;
-			mem_in.mode = 2'b00;
+			mem_in.mode = 3'b000;
 			next_state = SELECT_C;
+			a_in.mode = 1'b0;
 			finished = 1'b0;
 			case ( alloc_state )
 				SELECT_C: begin
@@ -480,12 +502,15 @@ module alloc_fsm(
 					next_state = ALLOC;
 				end
 				ALLOC: begin
-					mem_in.mode = 2'b10;
+					mem_in.mode = 3'b010; // allocate space
+					reg_in.sel = regC;
+					reg_in.mode = 1'b0;
 					next_state = WRITE_B;
 				end
 				WRITE_B: begin
 					reg_in.mode = 1'b1;
 					reg_in.sel = regB;
+					a_in.mode = 1'b1;
 					next_state = FIN;
 				end
 				FIN: begin
@@ -563,12 +588,78 @@ endmodule
 module load_fsm(
 	input [2:0] regA, regB, regC,
 	input [31:0] reg_out_bus,
-	input [31:0] mem_data_out_bus,
+	input [31:0] mem_out_bus,
 	input clk, en,
 	output reg_in_bus_t reg_in,
 	output mem_in_bus_t mem_in,
+	output astore_in_bus_t a_in,
 	output [31:0] new_offset, // execution finger
-	output finished
+	output logic finished
 );
+	reg [31:0] offset;
+	reg [31:0] src;
+	typedef enum logic [20:0] { SELECT_B_Z, SELECT_C, SET_OFFSET, COPY_B_ALLOC, COPY_B } load_state_t;
+	load_state_t state, next_state;
 	
+	mem_in_bus_t copier_mem_in;
+	
+	reg [31:0] copier_dest;
+	wire [31:0] copier_length, copier_src;
+	
+	assign new_offset = offset;
+	
+	mem_copier(
+		copier_src,
+		copier_length,
+		copier_dest,
+		
+	);
+	
+	always_comb
+		begin
+			
+			case ( state )
+				SELECT_B_Z: begin
+					mem_in.mode = 3'b111; // get address of current "Zero" array
+					reg_in.mode = 1'b0;
+					reg_in.sel = regB;
+					
+					next_state = SELECT_C;
+				end
+				SELECT_C: begin
+					reg_in.mode = 1'b0;
+					reg_in.sel = regC;
+
+					if (reg_out_bus == mem_out_bus) begin
+						next_state = SET_OFFSET;
+					end else begin
+						next_state = COPY_B;
+					end
+				end
+				SET_OFFSET: begin
+					offset = reg_out_bus;
+				end
+				COPY_B_ALLOC: begin
+					mem_in.mode = 3'b010; // alloc
+					mem_in.offset = reg_out_bus;
+					
+					reg_in.mode = 1'b0;
+					reg_in.sel = regB;
+					
+					next_state = COPY_B;
+				end
+				COPY_B: begin
+					mem_in.mode = copier_mem_in.mode;
+					mem_in.address = copier_mem_in.address;
+					mem_in.data = copier_mem_in.data;
+					mem_in.offset = copier_mem_in.offset;
+				end
+			endcase
+		end
+	
+	always_ff@(posedge clk)
+		if ( !en )
+			state <= SELECT_B_Z;
+		else
+			state <= next_state;
 endmodule

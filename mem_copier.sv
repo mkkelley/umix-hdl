@@ -1,6 +1,8 @@
 
 import BusTypes::mem_in_bus_t;
 
+// copy [src, src + length) to [dest, dest + length)
+// outputs finished = 1 when finished
 module mem_copier(
 	input [31:0] src, length, dest,
 	input [31:0] mem_data_out,
