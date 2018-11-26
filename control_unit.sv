@@ -98,6 +98,16 @@ module control_unit(
 
 	// end alu stuff
 
+    // Free operation will do nothing for now.
+
+	assign instr_finished[9] = 1'b1;
+	assign fsm_reg_in[9] = {'z, 'z, 1'b0};
+	assign fsm_mem_in[9] = {'z, 'z, 'z, 2'b00};
+	assign fsm_alu_x[9] = 'z;
+	assign fsm_alu_y[9] = 'z;
+
+	// End Free operation changes
+
 	accumulator offset_acc(offset_in, offset_ctrl, clk, offset);
 
 	cmov_fsm cmov(regA, regB, regC, reg_data_out, clk, r,
@@ -548,4 +558,17 @@ module ortho_fsm(
 	assign reg_in.data = {7'b0, val};
 	
 	assign finished = 1;
+endmodule
+
+module load_fsm(
+	input [2:0] regA, regB, regC,
+	input [31:0] reg_out_bus,
+	input [31:0] mem_data_out_bus,
+	input clk, en,
+	output reg_in_bus_t reg_in,
+	output mem_in_bus_t mem_in,
+	output [31:0] new_offset, // execution finger
+	output finished
+);
+	
 endmodule

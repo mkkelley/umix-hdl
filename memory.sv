@@ -9,13 +9,15 @@ module mem_in_bus_buf(
 	tribuf_32 address_buf(in.address, en, out.address);
 	tribuf_32 offset_buf(in.offset, en, out.offset);
 	tribuf_32 data_buf(in.data, en, out.data);
-	tribuf_n #(2) mode_buf(in.mode, en, out.mode);
+	tribuf_n #(3) mode_buf(in.mode, en, out.mode);
 endmodule
 
-// mode = 2'b00 -> data_out = *(address + offset)
-// mode = 2'b01 -> *(address + offset) <= data
-// mode = 2'b10 -> data_out = malloc(offset)
-// mode = 2'b11 -> zero_array_address <= address
+// mode = 2'b000 -> data_out = *(address + offset)
+// mode = 2'b001 -> *(address + offset) <= data
+// mode = 2'b010 -> data_out = malloc(offset)
+// mode = 2'b011 -> zero_array_address <= address
+// mode = 2'b111 -> data_out = zero_array_address
+// mode = 2'b100 -> do nothing
 module mem_sys(
 	input mem_in_bus_t mem_bus,
 	input clk,
@@ -40,12 +42,14 @@ module mem_sys(
 		zero_array_address <= 32'b0;
 		next_alloc <= 32'b10000;
 	end else case(mem_bus.mode)
-		2'b00: data_out <= main_mem[real_address + mem_bus.offset];
-		2'b01: main_mem[real_address + mem_bus.offset] <= mem_bus.data;
-		2'b10: begin
+		3'b000: data_out <= main_mem[real_address + mem_bus.offset];
+		3'b001: main_mem[real_address + mem_bus.offset] <= mem_bus.data;
+		3'b010: begin
 			data_out <= next_alloc;
 			next_alloc <= next_alloc + mem_bus.offset;
 		end
-		2'b11: zero_array_address <= mem_bus.data;
+		3'b011: zero_array_address <= mem_bus.data;
+		3'b100: data_out <= data_out;
+		3'b111: data_out <= zero_array_address;
 	endcase
 endmodule
